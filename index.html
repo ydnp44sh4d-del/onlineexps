@@ -13,7 +13,7 @@
 body{margin:0;background:#0a0a0b;color:#f5f5f4;font:14px system-ui,sans-serif}
 main{max-width:680px;margin:auto;padding:28px 18px 60px}
 header{display:flex;justify-content:space-between;gap:20px;border-bottom:1px solid #29292d;padding-bottom:22px;margin-bottom:24px}
-h1{font-size:25px;letter-spacing:5px;font-weight:500;margin:0}
+.brand-logo{display:block;width:190px;max-width:52vw;height:auto}
 h2{font-size:17px;margin:0 0 15px}
 .sub,small{color:var(--muted);font-size:12px}
 .sub{margin-top:6px}
@@ -57,14 +57,21 @@ main{display:none}
 <body>
 <main>
 <header>
-<div><h1>MALLOCK</h1><div class="sub">AUTOMOTIVE · EXPENSE LEDGER</div></div>
+<div><svg class="brand-logo" viewBox="0 0 163.4 20.61" role="img" aria-label="Mallock" xmlns="http://www.w3.org/2000/svg">
+<defs><linearGradient id="chromeFill" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" stop-color="#fff"/><stop offset="14%" stop-color="#c2c2c7"/>
+<stop offset="28%" stop-color="#3f3f45"/><stop offset="40%" stop-color="#f7f7f9"/>
+<stop offset="50%" stop-color="#1c1c20"/><stop offset="60%" stop-color="#eeeef0"/>
+<stop offset="72%" stop-color="#4a4a50"/><stop offset="86%" stop-color="#fff"/>
+<stop offset="100%" stop-color="#7c7c82"/></linearGradient></defs>
+<path fill="url(#chromeFill)" stroke="#fff" stroke-opacity=".3" stroke-width=".12" d="M145.89,17.95l-8.51-8.51L146.49.33h-3.19l-7.99,7.99V.33h-2.25v17.62h-5.99v-1.65h-1.13c-3.78,0-6.86-3.08-6.86-6.86s3.08-6.86,6.86-6.86h1.13V.33h-1.13c-5.03,0-9.11,4.09-9.11,9.11,0,3.88,2.43,7.19,5.85,8.51h-15.7c3.42-1.32,5.85-4.63,5.85-8.51,0-5.03-4.09-9.11-9.11-9.11s-9.11,4.09-9.11,9.11c0,3.88,2.43,7.19,5.85,8.51h-9.85v-1.73h-5.99V.33h-2.25v17.62h-6.17v-1.73h-5.99V.33h-2.25v17.62h-5.77L54.85,0l-7.34,17.95h-3.73L36.44,0l-5.99,14.65L24.46,0l-7.34,17.95H0v1.21h29.86l.59,1.45.59-1.45h132.36v-1.21h-17.51ZM96.86,9.44c0-3.78,3.08-6.86,6.86-6.86s6.86,3.08,6.86,6.86-3.08,6.86-6.86,6.86-6.86-3.08-6.86-6.86ZM19.56,17.95l4.9-12,4.9,12h-9.81ZM135.32,10.57l7.38,7.38h-7.38v-7.38ZM54.85,5.96l2.6,6.35h-5.19l2.6-6.35ZM51.33,14.56h7.04l1.38,3.39h-9.81l1.38-3.39ZM31.54,17.95l4.9-12,4.9,12h-9.81Z"/></svg><div class="sub">AUTOMOTIVE · EXPENSE LEDGER</div></div>
 <div id="totals">GBP 0.00</div>
 </header>
 
 <section class="panel" id="loginPanel">
 <h2>Connect receipt scanning</h2>
 <p class="sub">Enter your APP_TOKEN from Cloudflare—not your OpenAI API key.
-The token is kept in memory only, until this page is closed or refreshed.</p>
+This browser remembers the token until you choose Lock scanning or clear site data. Use only on a private device.</p>
 <form id="loginForm" class="row">
 <input id="token" type="password" autocomplete="off"
  aria-label="App access token" placeholder="Private app access token" required>
@@ -139,6 +146,7 @@ totalled separately; no exchange rates are applied.
 const WORKER_URL =
   "https://mallock-expenses-api.michaelm-e8b.workers.dev/";
 const KEY = "mallock-expenses";
+const TOKEN_KEY = "mallock-expenses-app-token";
 const CATS = [
   "Travel","Meals & Entertainment","Accommodation","Fuel & Transport",
   "Office & Supplies","Software & Subscriptions","Professional Services",
@@ -193,6 +201,11 @@ try {
   storageReadable = false;
   say("Saved data could not be read. Nothing has been overwritten. Restore a valid backup to continue.");
 }
+
+try {
+  const savedToken = localStorage.getItem(TOKEN_KEY) || "";
+  if (savedToken.length >= 32 && !savedToken.startsWith("sk-")) appToken = savedToken;
+} catch {}
 
 function persist(next) {
   if (!storageReadable) {
@@ -312,16 +325,30 @@ $("loginForm").onsubmit = event => {
   }
   if (token.length < 32) return say("Enter the full APP_TOKEN (at least 32 characters).");
   appToken = token;
+  let remembered = false;
+  try {
+    localStorage.setItem(TOKEN_KEY, token);
+    remembered = true;
+  } catch {}
   $("token").value = "";
   $("loginPanel").hidden = true;
   $("connected").hidden = false;
-  say("Token entered. Upload a receipt to test the connection.");
+  say(remembered
+    ? "Access token saved on this device. Upload a receipt to test the connection."
+    : "Connected for this visit. Browser storage is unavailable, so the token could not be remembered.");
 };
 $("lock").onclick = () => {
   appToken = "";
+  let removed = false;
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+    removed = true;
+  } catch {}
   $("loginPanel").hidden = false;
   $("connected").hidden = true;
-  say("Scanning locked. Existing expenses remain on this device.");
+  say(removed
+    ? "Scanning locked and saved token removed. Existing expenses remain on this device."
+    : "Scanning locked for this visit, but the saved token could not be removed. Retry Lock scanning when browser storage is available.");
 };
 
 async function resize(file) {
@@ -458,6 +485,11 @@ $("backupFile").onchange = async event => {
     say("Restore failed: invalid backup or insufficient browser storage. Existing data was not replaced.");
   } finally { event.target.value = ""; }
 };
+if (appToken) {
+  $("loginPanel").hidden = true;
+  $("connected").hidden = false;
+  if (storageReadable) say("Receipt scanning ready.");
+}
 render();
 </script>
 </body>
